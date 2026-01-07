@@ -1,8 +1,9 @@
 import type { Product } from '@/contexts/CartContext';
 import { imagePaths } from './imagePaths';
+import { productOverrides } from './productOverrides';
 import { getCustomProducts, getHiddenProductIds, getRuntimeCustomProducts } from './products';
 
-export type SkincareSubcategory = 
+export type SkincareSubcategory =
   | 'cremes hydratantes'
   | 'masques visage'
   | 'nettoyants'
@@ -34,11 +35,11 @@ interface SkincareImageInfo {
 // Parser les chemins d'images pour extraire les catégories
 const parseImagePaths = (): SkincareImageInfo[] => {
   const skincareImages = imagePaths.skincare || [];
-  
+
   return skincareImages.map(path => {
     // Format: "images/skincare/{subcategory}/{subSubcategory}/..."
     const parts = path.split('/');
-    
+
     if (parts.length < 4) {
       // Pas de sous-catégorie ou sous-sous-catégorie
       return {
@@ -46,10 +47,10 @@ const parseImagePaths = (): SkincareImageInfo[] => {
         subcategory: 'cremes hydratantes', // Default
       };
     }
-    
+
     const subcategory = parts[2] as SkincareSubcategory;
     const subSubcategory = parts[3] as SkincareSubSubcategory;
-    
+
     return {
       path: '/' + path.replace(/\\/g, '/'),
       subcategory,
@@ -62,25 +63,28 @@ const parseImagePaths = (): SkincareImageInfo[] => {
 const buildSkincareProducts = (images: SkincareImageInfo[]): Product[] => {
   return images.map((img, index) => {
     const id = `skincare-${img.subcategory}-${img.subSubcategory || 'default'}-${index + 1}`;
-    
-    // Générer un nom basé sur la catégorie
-    let name = 'Produit Skincare';
+
+    // Générer un nom basé sur la catégorie comme fallback
+    let defaultName = 'Produit Skincare';
     if (img.subSubcategory) {
-      name = `${img.subSubcategory} ${index + 1}`;
+      defaultName = `${img.subSubcategory} ${index + 1}`;
     } else if (img.subcategory) {
-      name = `${img.subcategory} ${index + 1}`;
+      defaultName = `${img.subcategory} ${index + 1}`;
     }
-    
+
+    const override = productOverrides[id];
+
     return {
       id,
-      name,
-      price: 0,
+      name: override?.name ?? defaultName,
+      price: override?.price ?? 0,
       image: img.path,
       category: 'skincare' as const,
-      description: `Produit de soin de la peau - ${img.subcategory}${img.subSubcategory ? ` - ${img.subSubcategory}` : ''}`,
+      description: override?.description ?? `Produit de soin de la peau - ${img.subcategory}${img.subSubcategory ? ` - ${img.subSubcategory}` : ''}`,
       subcategory: img.subcategory,
       subSubcategory: img.subSubcategory,
-    };
+      gallery: override?.gallery,
+    } as unknown as Product;
   });
 };
 
@@ -107,15 +111,15 @@ export const getSkincareProducts = (
   subSubcategory?: SkincareSubSubcategory
 ): Product[] => {
   let filtered = allSkincareProducts;
-  
+
   if (subcategory) {
-    filtered = filtered.filter(p => p.subcategory === subcategory);
+    filtered = filtered.filter(p => (p as any).subcategory === subcategory);
   }
-  
+
   if (subSubcategory) {
-    filtered = filtered.filter(p => p.subSubcategory === subSubcategory);
+    filtered = filtered.filter(p => (p as any).subSubcategory === subSubcategory);
   }
-  
+
   return filtered;
 };
 
@@ -135,7 +139,7 @@ export const getSkincareSubSubcategories = (
   subcategory?: SkincareSubcategory
 ): SkincareSubSubcategory[] => {
   const subSubcategories = new Set<SkincareSubSubcategory>();
-  
+
   parsedImages.forEach(img => {
     if (img.subSubcategory) {
       if (!subcategory || img.subcategory === subcategory) {
@@ -143,6 +147,6 @@ export const getSkincareSubSubcategories = (
       }
     }
   });
-  
+
   return Array.from(subSubcategories);
 };

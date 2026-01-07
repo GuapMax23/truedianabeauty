@@ -8,6 +8,8 @@ import {
   mapCustomRecordToProduct,
 } from './products';
 
+import { getSkincareProducts } from './skincareCatalog';
+
 type LocalCategory = Product['category'];
 
 const buildProducts = (params: {
@@ -74,7 +76,12 @@ console.log(`[LocalCatalog] Produits créés:`, {
   total: localCatalog.femme.length + localCatalog.homme.length,
 });
 
-const rawBaseProducts: Product[] = [...localCatalog.homme, ...localCatalog.femme];
+// Inclure les produits skincare dans la liste de base
+const rawBaseProducts: Product[] = [
+  ...localCatalog.homme,
+  ...localCatalog.femme,
+  ...getSkincareProducts()
+];
 
 const buildCombinedProducts = (): Product[] => {
   const overrides = loadOverridesFromStorage();

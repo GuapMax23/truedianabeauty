@@ -254,13 +254,21 @@ const ProductManager = () => {
 
     setIsSaving(true);
     try {
+      // Identifier tous les produits qui partagent la même image
+      const duplicates = managedProducts.filter(
+        p => p.image === editingProduct.image
+      );
+
+      const idsToUpdate = duplicates.map(p => p.id);
+      const isBatchUpdate = idsToUpdate.length > 1;
+
       const response = await fetch('/api/save-product-override', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: editingProduct.id,
+          ids: idsToUpdate, // Utilisation du nouveau champ 'ids'
           name: editForm.name,
           price: editForm.price,
           description: editForm.description,
@@ -275,13 +283,15 @@ const ProductManager = () => {
 
       toast({
         title: 'Succès',
-        description: 'Produit mis à jour. La page va se recharger...',
+        description: isBatchUpdate
+          ? `${idsToUpdate.length} produits mis à jour simultanément (basé sur l'image).`
+          : 'Produit mis à jour.',
       });
 
       // Recharger pour que les nouveaux overrides soient pris en compte (re-import de overrides.ts)
       setTimeout(() => {
         window.location.reload();
-      }, 1000);
+      }, 1500);
 
     } catch (error: any) {
       console.error('Save error:', error);
@@ -413,23 +423,39 @@ const ProductManager = () => {
     }
   };
 
-  const handleDeleteCustomProduct = (productId: string) => {
-    if (!window.confirm('Supprimer définitivement ce produit ?')) return;
+  const handleDeleteCustomProduct = async (productId: string, isCustom: boolean) => {
+    if (!window.confirm(isCustom ? 'Supprimer définitivement ce produit ?' : 'Masquer ce produit du site ?')) return;
 
     try {
-      if (!overrides.customProducts.some(product => product.id === productId)) {
-        toast({
-          title: 'Produit protégé',
-          description: 'Seuls les produits ajoutés via ce formulaire peuvent être supprimés ici.',
+      if (isCustom) {
+        // Suppression réelle pour les produits custom (localStorage)
+        persistOverrides({
+          ...overrides,
+          customProducts: overrides.customProducts.filter(product => product.id !== productId),
         });
-        return;
+        toast({ title: 'Produit supprimé', description: 'Le produit a été retiré du site' });
+      } else {
+        // "Masquage" pour les produits de base (via API serveur)
+        const response = await fetch('/api/hidden-products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId, hidden: true }),
+        });
+
+        if (!response.ok) throw new Error('Erreur serveur');
+
+        // Mettre à jour l'état local immédiatement
+        persistOverrides({
+          ...overrides,
+          hiddenProductIds: [...overrides.hiddenProductIds, productId]
+        });
+
+        // Recharger la page pour être sûr que tout est synchro
+        setTimeout(() => window.location.reload(), 500);
+
+        toast({ title: 'Produit masqué', description: 'Le produit ne sera plus visible sur le site.' });
       }
 
-      persistOverrides({
-        ...overrides,
-        customProducts: overrides.customProducts.filter(product => product.id !== productId),
-      });
-      toast({ title: 'Produit supprimé', description: 'Le produit a été retiré du site' });
     } catch (error: any) {
       toast({
         title: 'Erreur',
@@ -621,19 +647,18 @@ const ProductManager = () => {
                       Modifier
                     </Button>
                     <Button
-                      onClick={() => handleDeleteCustomProduct(product.id)}
+                      onClick={() => handleDeleteCustomProduct(product.id, product.isCustom)}
                       size="sm"
                       variant="destructive"
                       className="flex-1"
-                      disabled={!product.isCustom}
                       title={
                         product.isCustom
-                          ? 'Supprimer ce produit'
-                          : 'Seuls les produits ajoutés peuvent être supprimés depuis cette interface'
+                          ? 'Supprimer définitivement ce produit'
+                          : 'Masquer ce produit du catalogue'
                       }
                     >
                       <Trash2 className="w-4 h-4 mr-1" />
-                      Supprimer
+                      {product.isCustom ? 'Supprimer' : 'Masquer'}
                     </Button>
                   </div>
                 </CardContent>

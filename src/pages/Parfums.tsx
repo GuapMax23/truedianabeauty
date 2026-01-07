@@ -26,7 +26,8 @@ const Parfums = () => {
 
   // TOUJOURS utiliser les produits locaux en priorité (images du dossier Parfum Homme/Femme)
   const localProducts = useMemo(() => {
-    const products = getLocalProducts();
+    // On ne veut que les parfums ici, donc on exclut explicitement le skincare
+    const products = getLocalProducts().filter(p => p.category !== 'skincare');
     console.log(`[Parfums] Produits locaux chargés: ${products.length}`, {
       homme: products.filter(p => p.category === 'homme').length,
       femme: products.filter(p => p.category === 'femme').length,

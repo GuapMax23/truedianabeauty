@@ -1,0 +1,6 @@
+{
+    "id": "verify-complex",
+    "name": "Product with ' Quotes",
+    "price": 99.99,
+    "description": "Description with backslash \\ and single quote ' and double \" quote."
+}

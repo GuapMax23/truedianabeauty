@@ -33,7 +33,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ 
+const upload = multer({
   storage,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max
@@ -293,20 +293,23 @@ app.post('/api/regenerate-images', async (req, res) => {
 // Route pour sauvegarder les détails d'un produit dans productOverrides.ts
 app.post('/api/save-product-override', async (req, res) => {
   try {
-    const { id, name, price, description } = req.body;
+    const { id, ids, name, price, description } = req.body;
 
-    if (!id) {
-      return res.status(400).json({ error: 'ID du produit requis' });
+    // Support single id or array of ids
+    const targetIds = ids || (id ? [id] : []);
+
+    if (targetIds.length === 0) {
+      return res.status(400).json({ error: 'ID(s) du produit requis' });
     }
 
     const productOverridesPath = path.join(rootDir, 'src', 'data', 'productOverrides.ts');
-    
+
     // Lire le fichier actuel
     let content = fs.readFileSync(productOverridesPath, 'utf-8');
-    
+
     // Extraire l'objet productOverrides
     const overrideMatch = content.match(/export const productOverrides[^=]*=\s*\{([\s\S]*?)\};/);
-    
+
     if (!overrideMatch) {
       return res.status(500).json({ error: 'Format du fichier productOverrides.ts invalide' });
     }
@@ -314,7 +317,7 @@ app.post('/api/save-product-override', async (req, res) => {
     // Parser les overrides existants
     const existingOverrides = {};
     const existingContent = overrideMatch[1].trim();
-    
+
     // Extraire les entrées existantes (simple parsing)
     const entryRegex = /'([^']+)':\s*\{([^}]+)\}/g;
     let match;
@@ -322,29 +325,35 @@ app.post('/api/save-product-override', async (req, res) => {
       const key = match[1];
       const valueStr = match[2];
       const override = {};
-      
+
       // Parser name
       const nameMatch = valueStr.match(/name:\s*['"]((?:\\'|[^'])+)['"]/);
-      if (nameMatch) override.name = nameMatch[1];
-      
+      if (nameMatch) {
+        override.name = nameMatch[1].replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+      }
+
       // Parser price
       const priceMatch = valueStr.match(/price:\s*(\d+)/);
       if (priceMatch) override.price = parseFloat(priceMatch[1]);
-      
+
       // Parser description
       const descMatch = valueStr.match(/description:\s*['"]((?:\\'|[^'])+)['"]/);
-      if (descMatch) override.description = descMatch[1];
-      
+      if (descMatch) {
+        // Unescape the read description: replace \\ with \ and \' with '
+        override.description = descMatch[1].replace(/\\\\/g, '\\').replace(/\\'/g, "'");
+      }
+
       existingOverrides[key] = override;
     }
 
-    // Mettre à jour ou ajouter l'override
-    const override = {};
-    if (name) override.name = name;
-    if (price !== undefined && price !== null && price !== '') override.price = parseFloat(price);
-    if (description) override.description = description;
-
-    existingOverrides[id] = override;
+    // Mettre à jour tous les IDs ciblés
+    targetIds.forEach(targetId => {
+      const override = existingOverrides[targetId] || {};
+      if (name) override.name = name;
+      if (price !== undefined && price !== null && price !== '') override.price = parseFloat(price);
+      if (description) override.description = description;
+      existingOverrides[targetId] = override;
+    });
 
     // Reconstruire le contenu du fichier
     const overridesEntries = Object.entries(existingOverrides)
@@ -356,7 +365,11 @@ app.post('/api/save-product-override', async (req, res) => {
         }
         if (value.price !== undefined) parts.push(`price: ${value.price}`);
         if (value.description) {
-          const safeDescription = value.description.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          const safeDescription = value.description
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '');
           parts.push(`description: '${safeDescription}'`);
         }
         return `  '${key}': {\n    ${parts.join(',\n    ')}\n  }`;
@@ -384,7 +397,7 @@ ${overridesEntries}
 
     res.json({
       success: true,
-      message: 'Détails du produit sauvegardés avec succès',
+      message: `${targetIds.length} produit(s) mis à jour avec succès`,
     });
   } catch (error) {
     console.error('Erreur lors de la sauvegarde:', error);

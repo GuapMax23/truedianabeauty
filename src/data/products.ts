@@ -27,7 +27,8 @@ export interface ProductDataFile {
 
 export const LOCAL_OVERRIDES_STORAGE_KEY = 'diana-product-overrides';
 
-export const productData: ProductDataFile = /*PRODUCT_DATA*/{
+export const productData: ProductDataFile = /*PRODUCT_DATA*/
+{
   "categories": [
     {
       "id": "homme",
@@ -51,8 +52,18 @@ export const productData: ProductDataFile = /*PRODUCT_DATA*/{
     }
   ],
   "customProducts": [],
-  "hiddenProductIds": []
-}/*END_PRODUCT_DATA*/;
+  "hiddenProductIds": [
+    "homme-25",
+    "homme-26",
+    "homme-27",
+    "homme-28",
+    "homme-30",
+    "femme-2",
+    "skincare-cremes hydratantes-Crèmes visage-8",
+    "skincare-cremes hydratantes-Gels hydratants-13"
+  ]
+}
+/*END_PRODUCT_DATA*/;
 
 export const mapCustomRecordToProduct = (record: CustomProductRecord): Product => ({
   id: record.id,
